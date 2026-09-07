@@ -54,6 +54,26 @@ jobs:
           fi
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
+      - name: Fix MapLibre startup initialization
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ['PROJECT_DIR']) / 'app/src/main/java/com/nv/navigation/core/map/MapLibreAndroidView.kt'
+          text = path.read_text(encoding='utf-8')
+          old = '''factory = { ctx ->
+                      MapView(ctx).apply {'''
+          new = '''factory = { ctx ->
+                      MapLibre.getInstance(ctx)
+                      MapView(ctx).apply {'''
+          if old not in text:
+              raise SystemExit('MapLibre factory pattern not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          print('Patched:', path)
+          PY
+
       - name: Build Debug APK
         run: |
           cd "$PROJECT_DIR"
@@ -69,7 +89,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: IR-NV-APK
+          name: IR-NV-APK-FIXED
           path: output/IR-NV.apk
           if-no-files-found: error
           retention-days: 30
